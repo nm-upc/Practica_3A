@@ -1,26 +1,24 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <SPIFFS.h>  // Librería para el sistema de archivos
 
-const char* ssid = "MOVISTAR_79C8";
-const char* password = "TAMALEON";
+const char* ssid = "wifi";
+const char* password = "contraseña";
 WebServer server(80);
 
-// HTML & CSS contents which display on web server
-String HTML = "<!DOCTYPE html>\
-<html>\
-<body>\
-<h1>My Primera Pagina con ESP32 - Station Mode &#128522;</h1>\
-</body>\
-</html>";
-
-// DECLARAR handle_root ANTES DE setup()
-void handle_root() {
-  server.send(200, "text/html", HTML);
-}
-
+// Declaración de funciones
+void handle_root();
+void handleNotFound();
 void setup() {
   Serial.begin(115200);
-  Serial.println("Try Connecting to ");
+  
+  // Inicializar SPIFFS
+  if(!SPIFFS.begin(true)) {
+    Serial.println("Error al montar SPIFFS");
+    return;
+  }
+  
+  Serial.println("Conectando a WiFi...");
   Serial.println(ssid);
   
   WiFi.begin(ssid, password);
@@ -31,16 +29,36 @@ void setup() {
   }
   
   Serial.println("");
-  Serial.println("WiFi connected successfully");
-  Serial.print("Got IP: ");
+  Serial.println("WiFi conectado exitosamente");
+  Serial.print("Dirección IP: ");
   Serial.println(WiFi.localIP());
   
-  server.on("/", handle_root);  // Ahora handle_root ya está declarada
+  // Configurar rutas del servidor
+  server.on("/", handle_root);
+  server.onNotFound(handleNotFound);
+  
   server.begin();
-  Serial.println("HTTP server started");
-  delay(100);
+  Serial.println("Servidor HTTP iniciado");
 }
 
 void loop() {
   server.handleClient();
+}
+
+void handle_root() {
+  // Leer el archivo HTML de SPIFFS
+  File file = SPIFFS.open("/index.html", "r");
+  if(!file) {
+    server.send(500, "text/plain", "Error al cargar el archivo HTML");
+    return;
+  }
+  
+  String html = file.readString();
+  file.close();
+  
+  server.send(200, "text/html", html);
+}
+
+void handleNotFound() {
+  server.send(404, "text/plain", "404: Página no encontrada");
 }
